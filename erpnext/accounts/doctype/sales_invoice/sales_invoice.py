@@ -62,6 +62,7 @@ class SalesInvoice(SellingController):
 		self.check_sales_order_on_hold_or_close()
 		self.validate_debit_to_acc()
 		self.validate_return_against()
+		self.validate_loaner_vehicle_booking()
 
 		self.check_advance_payment_against_order("sales_order")
 
@@ -636,6 +637,26 @@ class SalesInvoice(SellingController):
 				break
 		if validate_against_credit_limit:
 			check_credit_limit(self.customer, self.company, bypass_credit_limit_check_at_sales_order)
+
+	def validate_loaner_vehicle_booking(self):
+		if not self.project or not self.customer:
+			return
+		# Check for any active (Booked or Rented) loaner vehicle booking for this project and customer
+		active_booking = frappe.db.exists(
+			"Loaner Vehicle Booking",
+			{
+				"project": self.project,
+				"customer": self.customer,
+				"status": ["in", ["Booked", "Rented"]],
+				"docstatus": 1
+			}
+		)
+		if active_booking:
+			frappe.throw(_(
+				"Cannot create Sales Invoice for customer's vehicle while a Loaner Vehicle is still out. "
+				"Please ensure the loaner vehicle is returned before proceeding. "
+				"Active Loaner Vehicle Booking: {0}"
+			).format(frappe.get_desk_link("Loaner Vehicle Booking", active_booking)))
 
 	@frappe.whitelist()
 	def set_missing_values(self, for_validate=False):

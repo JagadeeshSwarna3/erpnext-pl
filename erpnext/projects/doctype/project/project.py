@@ -2318,6 +2318,22 @@ def make_against_project(project_name, dt):
 
 @frappe.whitelist()
 def make_sales_invoice(project_name, target_doc=None, depreciation_type=None, bill_multiple_projects=None):
+	# Restrict invoice creation if there is an active Loaner Vehicle Booking
+	active_booking = frappe.db.exists(
+		"Loaner Vehicle Booking",
+		{
+			"project": project_name,
+			"status": ["in", ["Booked", "Rented"]],
+			"docstatus": 1
+		}
+	)
+	if active_booking:
+		frappe.throw(_(
+			"Cannot create Sales Invoice while a Loaner Vehicle is still out. "
+			"Please ensure the loaner vehicle is returned before proceeding. "
+			"Active Loaner Vehicle Booking: {0}"
+		).format(frappe.get_desk_link("Loaner Vehicle Booking", active_booking)))
+
 	def map_delivery_notes(target, only_items=False, skip_postprocess=False):
 		from erpnext.controllers.queries import _get_delivery_notes_to_be_billed
 		from erpnext.stock.doctype.delivery_note.delivery_note import make_sales_invoice as invoice_from_delivery_note
